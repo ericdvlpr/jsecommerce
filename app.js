@@ -1,3 +1,9 @@
+const client = contentful.createClient({
+  // This is the space ID. A space is like a project folder in Contentful terms
+  space: "4dbtq9e6rucn",
+  // This is the access token for this space. Normally you get both ID and the token in the Contentful web app
+  accessToken: "BEEM7lsGbJhr4NxzavfLL60yEqSBNu50OrFFwUoYt5Q"
+});
 // TODO:
 //  --built cart function
 const cartBtn = document.querySelector(".cart-btn");
@@ -16,8 +22,16 @@ let buttonsDom = [];
 class Products {
   async getProducts() {
     try {
+      let contentful = await client.getEntries({
+        content_type: "comfyHouseProduct"
+      });
+
       let result = await fetch("products.json");
       let data = await result.json();
+      // console.log(contentful);
+
+      // let products = contentful.items;
+      // console.log(products);
       let products = data.items;
       products = products.map(item => {
         const { title, price } = item.fields;
@@ -47,7 +61,7 @@ class UI {
             />
             <button class="bag-btn" data-id=${product.id}>
               <i class="fa fa-shopping-cart">
-                add to bag
+                add to cart
               </i>
             </button>
           </div>
@@ -120,13 +134,71 @@ class UI {
     cartOverlay.classList.add("transparentBcg");
     cartDOM.classList.add("showCart");
   }
-  setupAPP(){
+  setupAPP() {
     cart = Storage.getCart();
     this.setCartValues(cart);
-    this.populate(cart);
+    this.populateCart(cart);
+    cartBtn.addEventListener("click", this.showCart);
+    closeCartBtn.addEventListener("click", this.hideCart);
   }
-  populateCart(cart){
-    cart.forEach(item =>this.addCartItem(item))
+  populateCart(cart) {
+    cart.forEach(item => this.addCartItem(item));
+  }
+  hideCart() {
+    cartOverlay.classList.remove("transparentBcg");
+    cartDOM.classList.remove("showCart");
+  }
+  cartLogic() {
+    clearCartBtn.addEventListener("click", () => {
+      this.clearCart();
+    });
+    cartContent.addEventListener("click", event => {
+      if (event.target.classList.contains("remove-item")) {
+        let removeItem = event.target;
+        let id = removeItem.dataset.id;
+        cartContent.removeChild(removeItem.parentElement.parentElement);
+        this.removeItem(id);
+      } else if (event.target.classList.contains("fa-chevron-up")) {
+        let addAmount = event.target;
+        let id = addAmount.dataset.id;
+        let tempItem = cart.find(item => item.id === id);
+        tempItem.amount = tempItem.amount + 1;
+        Storage.saveCart(cart);
+        this.setCartValues(cart);
+        addAmount.nextElementSibling.innerText = tempItem.amount;
+      } else if (event.target.classList.contains("fa-chevron-down")) {
+        let lowerAmount = event.target;
+        let id = lowerAmount.dataset.id;
+        let tempItem = cart.find(item => item.id === id);
+        tempItem.amount = tempItem.amount - 1;
+        if (tempItem.amount > 0) {
+          Storage.saveCart(cart);
+          this.setCartValues(cart);
+          lowerAmount.previousElementSibling.innerText = tempItem.amount;
+        } else {
+          cartContent.removeChild(lowerAmount.parentElement.parentElement);
+          this.removeItem(id);
+        }
+      }
+    });
+  }
+  clearCart() {
+    let cartItems = cart.map(item => item.id);
+    cartItems.forEach(id => this.removeItem(id));
+    while (cartContent.children.length > 0) {
+      cartContent.removeChild(cartContent.children[0]);
+    }
+  }
+  removeItem(id) {
+    cart = cart.filter(item => item.id !== id);
+    this.setCartValues(cart);
+    Storage.saveCart(cart);
+    let button = this.getSingleButton(id);
+    button.disabled = false;
+    button.innerHTML = `<i class="fa fa-shopping-cart"></i>add to cart`;
+  }
+  getSingleButton(id) {
+    return buttonsDom.find(button => button.dataset.id === id);
   }
 }
 
@@ -144,16 +216,18 @@ class Storage {
     localStorage.setItem("cart", JSON.stringify(cart));
   }
 
-  static getCart(){
-    return localStorage.getItem('cart')?JSON.parse(localStorage.getItem('cart'));
+  static getCart() {
+    return localStorage.getItem("cart")
+      ? JSON.parse(localStorage.getItem("cart"))
+      : [];
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   const ui = new UI();
   const products = new Products();
-//setup app
-ui.setupApp();
+  //setup app
+  ui.setupAPP();
   //get all products
   products
     .getProducts()
@@ -163,5 +237,6 @@ ui.setupApp();
     })
     .then(() => {
       ui.getBagButtons();
+      ui.cartLogic();
     });
 });
