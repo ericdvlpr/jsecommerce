@@ -33,7 +33,6 @@ class Products {
       // let products = contentful.items;
     
       let products = data.items;
-      console.log(products);
       products = products.map(item => {
         const { title, price } = item.fields;
         const { id } = item.sys;
